@@ -174,7 +174,8 @@ Defina estas variáveis em **Project > Settings > Environment Variables**:
 - `XTREAM_USERNAME`
 - `XTREAM_PASSWORD`
 - `FIREBASE_PROJECT_ID`
-- `FIREBASE_SERVICE_ACCOUNT_JSON` (JSON completo da service account, em uma linha)
+- `FIREBASE_SERVICE_ACCOUNT_BASE64` (recomendado: JSON da service account em base64)
+  - alternativa: `FIREBASE_SERVICE_ACCOUNT_JSON` (JSON em uma linha)
 
 Observações:
 

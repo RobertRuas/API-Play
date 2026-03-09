@@ -96,12 +96,34 @@ function initFirestore() {
 
   if (!admin.apps.length) {
     const inlineJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+    const inlineBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
     const servicePath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
     const googleCredPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
     const projectId = process.env.FIREBASE_PROJECT_ID || undefined;
 
-    if (inlineJson) {
-      const credentials = JSON.parse(inlineJson);
+    const parseInlineCredentials = () => {
+      const rawJson = String(inlineJson || "").trim();
+      const rawBase64 = String(inlineBase64 || "").trim();
+      let payload = "";
+      if (rawBase64) {
+        payload = Buffer.from(rawBase64, "base64").toString("utf8");
+      } else {
+        payload = rawJson;
+      }
+      // Remove aspas externas acidentais quando valor e colado como string completa.
+      if (
+        (payload.startsWith('"') && payload.endsWith('"')) ||
+        (payload.startsWith("'") && payload.endsWith("'"))
+      ) {
+        payload = payload.slice(1, -1);
+      }
+      // Corrige escapes comuns de ambiente.
+      payload = payload.replace(/\\n/g, "\n");
+      return JSON.parse(payload);
+    };
+
+    if (inlineJson || inlineBase64) {
+      const credentials = parseInlineCredentials();
       if (typeof credentials.private_key === "string") {
         credentials.private_key = credentials.private_key.replace(/\\n/g, "\n");
       }
@@ -125,8 +147,9 @@ function initFirestore() {
       });
     } else {
       throw new Error(
-        "Firebase nao configurado para backend. Defina FIREBASE_SERVICE_ACCOUNT_PATH " +
-          "(ex: ./keys/service-account.json) ou GOOGLE_APPLICATION_CREDENTIALS."
+        "Firebase nao configurado para backend. Defina FIREBASE_SERVICE_ACCOUNT_JSON " +
+          "ou FIREBASE_SERVICE_ACCOUNT_BASE64 (Vercel), ou FIREBASE_SERVICE_ACCOUNT_PATH/" +
+          "GOOGLE_APPLICATION_CREDENTIALS."
       );
     }
   }

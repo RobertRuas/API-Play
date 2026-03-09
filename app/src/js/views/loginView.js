@@ -12,14 +12,14 @@ export async function renderLoginView({ container, status, onLoginSuccess }) {
             <span>Usuario</span>
             <div class="login-input-wrap">
               <i class="bi bi-person"></i>
-              <input id="login-username" type="text" value="robert" autocomplete="username" required />
+              <input id="login-username" type="text" autocomplete="username" required />
             </div>
           </label>
           <label>
             <span>Senha</span>
             <div class="login-input-wrap">
               <i class="bi bi-shield-lock"></i>
-              <input id="login-password" type="password" value="sempre" autocomplete="current-password" required />
+              <input id="login-password" type="password" autocomplete="current-password" required />
             </div>
           </label>
           <button id="login-submit" type="submit">Entrar</button>

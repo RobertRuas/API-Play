@@ -9,9 +9,9 @@ const app = express();
 const CACHE_TTL_MS = 60 * 1000;
 
 let activeConnection = {
-  serverUrl: "http://playprime.top",
-  username: "717770178",
-  password: "778822612"
+  serverUrl: process.env.XTREAM_SERVER_URL || "",
+  username: process.env.XTREAM_USERNAME || "",
+  password: process.env.XTREAM_PASSWORD || ""
 };
 
 const cache = new Map();

@@ -7,18 +7,18 @@
 
 export const APP_CONFIG = {
   xtream: {
-    serverUrl: "http://playprime.top",
-    username: "717770178",
-    password: "778822612"
+    serverUrl: "",
+    username: "",
+    password: ""
   },
   firebase: {
-    apiKey: "AIzaSyCEsQeDFAiRnDOYk1CQ70gS9UGUqwqis_o",
-    authDomain: "play-tv-db.firebaseapp.com",
-    projectId: "play-tv-db",
-    storageBucket: "play-tv-db.firebasestorage.app",
-    messagingSenderId: "779618863140",
-    appId: "1:779618863140:web:323986699a21fc0614f0b1",
-    measurementId: "G-8V1CVL05V7"
+    apiKey: "",
+    authDomain: "",
+    projectId: "",
+    storageBucket: "",
+    messagingSenderId: "",
+    appId: "",
+    measurementId: ""
   }
 };
 

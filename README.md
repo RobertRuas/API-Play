@@ -156,24 +156,33 @@ Para funcionar localmente, configure uma credencial de service account:
    - `FIREBASE_SERVICE_ACCOUNT_PATH=/caminho/chave.json`
    - ou `FIREBASE_SERVICE_ACCOUNT_JSON='{"type":"service_account",...}'`
 3. Opcional: definir projeto explicitamente:
-   - `FIREBASE_PROJECT_ID=play-tv-db`
+   - `FIREBASE_PROJECT_ID=<SEU_FIREBASE_PROJECT_ID>`
 
 Exemplo:
 
 ```bash
-export FIREBASE_SERVICE_ACCOUNT_PATH="/Users/admin/keys/play-tv-db-service-account.json"
-export FIREBASE_PROJECT_ID="play-tv-db"
+export FIREBASE_SERVICE_ACCOUNT_PATH="/Users/admin/keys/service-account.json"
+export FIREBASE_PROJECT_ID="<SEU_FIREBASE_PROJECT_ID>"
 npm start
 ```
 
-Neste projeto, o `.env` já vem com:
+## 11. Deploy na Vercel (sem credenciais no repositório)
 
-- `FIREBASE_PROJECT_ID=play-tv-db`
-- `FIREBASE_SERVICE_ACCOUNT_PATH=./keys/play-tv-db-service-account.json`
+Defina estas variáveis em **Project > Settings > Environment Variables**:
 
-Basta colocar o arquivo JSON da service account nesse caminho.
+- `XTREAM_SERVER_URL`
+- `XTREAM_USERNAME`
+- `XTREAM_PASSWORD`
+- `FIREBASE_PROJECT_ID`
+- `FIREBASE_SERVICE_ACCOUNT_JSON` (JSON completo da service account, em uma linha)
 
-## 11. Responsividade e manutenção
+Observações:
+
+- Não comite arquivos de chave (`keys/`) nem `.env` com valores reais.
+- Se o JSON vier com `\\n` na `private_key`, o backend normaliza automaticamente.
+- Após salvar as variáveis, faça redeploy.
+
+## 12. Responsividade e manutenção
 
 Responsividade prevista para:
 

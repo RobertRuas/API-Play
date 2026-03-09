@@ -38,9 +38,9 @@ const HOST = process.env.HOST || "0.0.0.0";
 const CACHE_TTL_MS = 60 * 1000;
 
 let activeConnection = {
-  serverUrl: process.env.XTREAM_SERVER_URL || "http://playprime.top",
-  username: process.env.XTREAM_USERNAME || "717770178",
-  password: process.env.XTREAM_PASSWORD || "778822612"
+  serverUrl: process.env.XTREAM_SERVER_URL || "",
+  username: process.env.XTREAM_USERNAME || "",
+  password: process.env.XTREAM_PASSWORD || ""
 };
 
 const cache = new Map();
@@ -692,6 +692,12 @@ if (require.main === module) {
     console.log(`Servidor em http://localhost:${PORT}`);
     for (const ip of lanIps) {
       console.log(`Rede local: http://${ip}:${PORT}`);
+    }
+    if (!activeConnection.serverUrl || !activeConnection.username || !activeConnection.password) {
+      console.warn(
+        "Aviso: XTREAM_SERVER_URL, XTREAM_USERNAME e XTREAM_PASSWORD nao estao completos. " +
+          "Defina as variaveis de ambiente no servidor (ex.: Vercel)."
+      );
     }
   });
 }

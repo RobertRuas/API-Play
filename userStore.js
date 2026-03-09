@@ -98,7 +98,7 @@ function initFirestore() {
     const inlineJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
     const servicePath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
     const googleCredPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-    const projectId = process.env.FIREBASE_PROJECT_ID || "play-tv-db";
+    const projectId = process.env.FIREBASE_PROJECT_ID || undefined;
 
     if (inlineJson) {
       const credentials = JSON.parse(inlineJson);
@@ -126,7 +126,7 @@ function initFirestore() {
     } else {
       throw new Error(
         "Firebase nao configurado para backend. Defina FIREBASE_SERVICE_ACCOUNT_PATH " +
-          "(ex: ./keys/play-tv-db-service-account.json) ou GOOGLE_APPLICATION_CREDENTIALS."
+          "(ex: ./keys/service-account.json) ou GOOGLE_APPLICATION_CREDENTIALS."
       );
     }
   }

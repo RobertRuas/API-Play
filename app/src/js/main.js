@@ -1,3 +1,13 @@
+// -----------------------------------------------------------------------------
+// Ponto de entrada da SPA (Single Page Application)
+// -----------------------------------------------------------------------------
+// Responsabilidades deste arquivo:
+// 1) Configurar roteamento por hash.
+// 2) Controlar estado visual global (menu mobile, status e layout de rota).
+// 3) Encaminhar cada rota para sua view.
+// 4) Executar bootstrap inicial da sessao.
+// -----------------------------------------------------------------------------
+
 import { createRouter } from "./core/router.js";
 import { playerModal } from "./ui/playerModal.js";
 import { withPageLoader } from "./ui/pageLoader.js";
@@ -22,6 +32,7 @@ const globalSearchInputEl = document.getElementById("global-search-input");
 const menuToggleEl = document.getElementById("menu-toggle");
 const sidebarOverlayEl = document.getElementById("sidebar-overlay");
 
+// Faixa de mensagens globais da aplicacao.
 const status = {
   show(message) {
     statusEl.textContent = message;
@@ -33,21 +44,25 @@ const status = {
   }
 };
 
+// Ajusta classes globais do body conforme rota ativa.
 function setLayoutForRoute(path) {
   document.body.classList.toggle("is-login-route", path === "/login");
   if (path === "/login") closeMobileMenu();
 }
 
+// Fecha menu lateral em telas pequenas.
 function closeMobileMenu() {
   document.body.classList.remove("menu-open");
   if (sidebarOverlayEl) sidebarOverlayEl.hidden = true;
 }
 
+// Abre menu lateral em telas pequenas.
 function openMobileMenu() {
   document.body.classList.add("menu-open");
   if (sidebarOverlayEl) sidebarOverlayEl.hidden = false;
 }
 
+// Alterna estado do menu mobile.
 function toggleMobileMenu() {
   if (document.body.classList.contains("menu-open")) {
     closeMobileMenu();
@@ -56,6 +71,7 @@ function toggleMobileMenu() {
   openMobileMenu();
 }
 
+// Marca item ativo no menu lateral.
 function setActiveNav(path) {
   const links = document.querySelectorAll(".side-nav a[data-link], .sidebar-bottom a[data-link]");
   for (const link of links) {
@@ -70,6 +86,7 @@ function setActiveNav(path) {
   }
 }
 
+// Fallback visual para rota inexistente.
 function renderNotFound() {
   appEl.innerHTML = `
     <section>
@@ -81,6 +98,7 @@ function renderNotFound() {
   status.hide();
 }
 
+// Rotas privadas exigem sessao ativa.
 async function ensurePrivateAccess(path) {
   if (path === "/login") return true;
   const session = await ensureSession();
@@ -89,6 +107,7 @@ async function ensurePrivateAccess(path) {
   return false;
 }
 
+// Declaracao das rotas da aplicacao.
 const router = createRouter(
   [
     {
@@ -201,6 +220,7 @@ const router = createRouter(
   renderNotFound
 );
 
+// Delegacao de cliques globais (logout e links internos com data-link).
 document.addEventListener("click", async (event) => {
   const logoutBtn = event.target.closest("a[data-action='logout']");
   if (logoutBtn) {
@@ -222,22 +242,27 @@ document.addEventListener("click", async (event) => {
   router.resolve();
 });
 
+// Botao de menu mobile.
 if (menuToggleEl) {
   menuToggleEl.addEventListener("click", () => toggleMobileMenu());
 }
 
+// Fechar menu ao clicar no overlay.
 if (sidebarOverlayEl) {
   sidebarOverlayEl.addEventListener("click", () => closeMobileMenu());
 }
 
+// Ao voltar para desktop, garante menu mobile fechado.
 window.addEventListener("resize", () => {
   if (window.innerWidth > 1024) closeMobileMenu();
 });
 
+// Escape fecha menu mobile.
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeMobileMenu();
 });
 
+// Busca global do menu lateral direciona para rota de pesquisa.
 if (globalSearchFormEl) {
   globalSearchFormEl.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -248,6 +273,8 @@ if (globalSearchFormEl) {
   });
 }
 
+// Inicializacao principal da aplicacao.
+// Tenta sessao existente e, se houver, aplica configuracoes de player.
 async function bootstrap() {
   try {
     let session = await ensureSession();

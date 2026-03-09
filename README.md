@@ -1,33 +1,39 @@
 # API-Play
 
-Aplicacao Node/Express com frontend HTML/CSS/JS para consumir Xtream.
+Aplicacao web simples para consumo de Xtream.
 
-## Arquitetura atual
+## Objetivo do projeto
 
-- Backend Express em `server.js`
-- Frontend SPA em `app/public` + `app/src/js`
-- Sessao/autenticacao/preferencias em **memoria no servidor** (`userStore.js`)
-- **Sem Firebase** e **sem banco de dados**
+- manter apenas o essencial para reproduzir TV, filmes e series;
+- evitar dependencias externas de banco de dados;
+- manter codigo legivel para manutencao rapida.
 
-## Importante sobre persistencia
+## Arquitetura
 
-Como o armazenamento e em memoria:
+- `server.js`:
+  backend Express com endpoints basicos de integracao Xtream.
+- `app/public`:
+  HTML e CSS da interface.
+- `app/src/js`:
+  logica de SPA, servicos e views.
 
-- reiniciar o processo apaga sessoes/preferencias/favoritos/progresso;
-- em ambientes serverless, esses dados podem resetar com frequencia.
+### Persistencia
+
+Nao existe banco de dados.
+
+Dados como favoritos, configuracoes e progresso ficam no `localStorage` do navegador.
 
 ## Variaveis de ambiente
 
-A aplicacao usa somente estas variaveis:
+Somente estas variaveis sao utilizadas:
 
 - `XTREAM_SERVER_URL`
 - `XTREAM_USERNAME`
 - `XTREAM_PASSWORD`
-- `AUTO_LOGIN_OVERRIDE` (opcional, sobrepoe escolha do admin)
 
-Arquivo de exemplo: `.env.example`.
+Use o arquivo `.env.example` como referencia.
 
-## Executar localmente
+## Execucao local
 
 1. Instale dependencias:
 
@@ -35,7 +41,7 @@ Arquivo de exemplo: `.env.example`.
 npm install
 ```
 
-2. Crie `.env` com as variaveis Xtream:
+2. Crie o arquivo `.env`:
 
 ```bash
 XTREAM_SERVER_URL=http://seu-servidor-xtream
@@ -43,35 +49,18 @@ XTREAM_USERNAME=seu_usuario
 XTREAM_PASSWORD=sua_senha
 ```
 
-3. Rode:
+3. Inicie em desenvolvimento:
 
 ```bash
 npm run dev
 ```
 
-Servidor:
+4. URLs de acesso:
 
 - `http://localhost:3000`
 - `http://<IP_DA_SUA_REDE>:3000`
 
-## Deploy (Vercel)
-
-Configure no projeto Vercel:
-
-- `XTREAM_SERVER_URL`
-- `XTREAM_USERNAME`
-- `XTREAM_PASSWORD`
-- `AUTO_LOGIN_OVERRIDE` (opcional)
-
-Depois, redeploy.
-
-Valores aceitos em `AUTO_LOGIN_OVERRIDE`:
-
-- `off` / `false` / `0` / `disabled`: desativa auto-login.
-- `on` / `true` / `1` / `enabled`: ativa auto-login com usuario configurado (fallback `robert`).
-- `<username>`: ativa auto-login e força esse usuario.
-
-## Estrutura principal
+## Estrutura
 
 ```text
 .
@@ -80,6 +69,5 @@ Valores aceitos em `AUTO_LOGIN_OVERRIDE`:
 │   └── src/js/
 ├── .env.example
 ├── package.json
-├── server.js
-└── userStore.js
+└── server.js
 ```

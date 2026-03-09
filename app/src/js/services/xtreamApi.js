@@ -13,7 +13,7 @@
 // - tudo que e estado do usuario fica no navegador.
 // -----------------------------------------------------------------------------
 
-import { API_CACHE_TTL_MS, DEFAULT_CONN } from "../config.js";
+import { API_CACHE_TTL_MS, APP_CONFIG, DEFAULT_CONN } from "../config.js";
 import { withPageLoader } from "../ui/pageLoader.js";
 
 const cache = new Map();
@@ -24,7 +24,7 @@ const DEFAULT_USER = {
   id: "local-admin",
   name: "Robert Ruas",
   email: "local@browser.session",
-  username: "robert",
+  username: APP_CONFIG.client.loginUsername || "robert",
   role: "admin"
 };
 
@@ -155,11 +155,18 @@ function setProgressLocal(value) {
 
 // Le configuracao local de auto-login (escopo apenas navegador atual).
 function getAuthConfigLocal() {
-  const fallback = { auto_login_enabled: true, auto_login_username: "robert" };
+  const fallback = {
+    auto_login_enabled: Boolean(APP_CONFIG.client.autoLoginEnabled),
+    auto_login_username: String(APP_CONFIG.client.loginUsername || "robert")
+  };
   const row = getJson(STORAGE.authConfig, fallback);
   if (!row || typeof row !== "object") return fallback;
   const enabled = Boolean(row.auto_login_enabled);
-  const username = String(row.auto_login_username || "robert").trim().toLowerCase() || "robert";
+  const username =
+    String(row.auto_login_username || APP_CONFIG.client.loginUsername || "robert")
+      .trim()
+      .toLowerCase() ||
+    "robert";
   const next = { auto_login_enabled: enabled, auto_login_username: username };
   setJson(STORAGE.authConfig, next);
   return next;
@@ -169,7 +176,10 @@ function getAuthConfigLocal() {
 function setAuthConfigLocal(value) {
   const next = {
     auto_login_enabled: Boolean(value?.auto_login_enabled),
-    auto_login_username: String(value?.auto_login_username || "robert").trim().toLowerCase() || "robert"
+    auto_login_username:
+      String(value?.auto_login_username || APP_CONFIG.client.loginUsername || "robert")
+        .trim()
+        .toLowerCase() || "robert"
   };
   setJson(STORAGE.authConfig, next);
   return next;
@@ -287,7 +297,9 @@ export function getSession() {
 export async function loginApp({ username, password }) {
   const user = String(username || "").trim().toLowerCase();
   const pass = String(password || "");
-  if (user !== "robert" || pass !== "sempre") {
+  const validUser = String(APP_CONFIG.client.loginUsername || "robert").trim().toLowerCase();
+  const validPass = String(APP_CONFIG.client.loginPassword || "sempre");
+  if (user !== validUser || pass !== validPass) {
     throw new Error("Credenciais invalidas.");
   }
   currentSession = { user: { ...DEFAULT_USER }, preferences: getSettingsLocal() };
@@ -298,7 +310,13 @@ export async function loginApp({ username, password }) {
 export async function tryAutoLogin() {
   const cfg = getAuthConfigLocal();
   if (!cfg.auto_login_enabled) return null;
-  currentSession = { user: { ...DEFAULT_USER, username: cfg.auto_login_username || "robert" }, preferences: getSettingsLocal() };
+  currentSession = {
+    user: {
+      ...DEFAULT_USER,
+      username: cfg.auto_login_username || APP_CONFIG.client.loginUsername || "robert"
+    },
+    preferences: getSettingsLocal()
+  };
   return currentSession;
 }
 

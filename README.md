@@ -25,11 +25,24 @@ Dados como favoritos, configuracoes e progresso ficam no `localStorage` do naveg
 
 ## Variaveis de ambiente
 
-Somente estas variaveis sao utilizadas:
+Todas as configuracoes da aplicacao sao lidas do `.env`.
 
+### Servidor
+
+- `PORT` (padrao: `3000`)
+- `HOST` (padrao: `0.0.0.0`)
 - `XTREAM_SERVER_URL`
 - `XTREAM_USERNAME`
 - `XTREAM_PASSWORD`
+- `XTREAM_TIMEOUT_MS` (padrao: `12000`)
+- `XTREAM_CACHE_TTL_MS` (padrao: `60000`)
+
+### Frontend (injetadas pelo backend em `/app-config.js`)
+
+- `APP_API_CACHE_TTL_MS` (padrao: `60000`)
+- `APP_LOGIN_USERNAME` (padrao: `robert`)
+- `APP_LOGIN_PASSWORD` (padrao: `sempre`)
+- `APP_AUTO_LOGIN_ENABLED` (padrao: `true`)
 
 Use o arquivo `.env.example` como referencia.
 
@@ -41,7 +54,7 @@ Use o arquivo `.env.example` como referencia.
 npm install
 ```
 
-2. Crie o arquivo `.env`:
+2. Crie o arquivo `.env` com base no `.env.example`.
 
 ```bash
 XTREAM_SERVER_URL=http://seu-servidor-xtream

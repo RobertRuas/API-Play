@@ -1,15 +1,22 @@
 // -----------------------------------------------------------------------------
-// Configuracoes globais da aplicacao (frontend)
+// Configuracoes globais do frontend (carregadas em runtime)
 // -----------------------------------------------------------------------------
-// Este arquivo centraliza configuracoes editaveis por ambiente.
-// Para deploy em producao, prefira injetar valores via processo de build/env.
+// As configuracoes sao injetadas pelo backend em /app-config.js com base no .env.
 // -----------------------------------------------------------------------------
+
+const runtime = window.__APP_ENV || {};
 
 export const APP_CONFIG = {
   xtream: {
-    serverUrl: "http://playprime.top",
-    username: "717770178",
-    password: "778822612"
+    serverUrl: String(runtime?.xtream?.serverUrl || "").trim(),
+    username: String(runtime?.xtream?.username || "").trim(),
+    password: String(runtime?.xtream?.password || "").trim()
+  },
+  client: {
+    apiCacheTtlMs: Number.parseInt(runtime?.client?.apiCacheTtlMs, 10) || 60 * 1000,
+    loginUsername: String(runtime?.client?.loginUsername || "robert").trim().toLowerCase(),
+    loginPassword: String(runtime?.client?.loginPassword || "sempre"),
+    autoLoginEnabled: Boolean(runtime?.client?.autoLoginEnabled ?? true)
   }
 };
 
@@ -19,5 +26,4 @@ export const DEFAULT_CONN = {
   password: APP_CONFIG.xtream.password
 };
 
-// TTL do cache no cliente (em milissegundos).
-export const API_CACHE_TTL_MS = 60 * 1000;
+export const API_CACHE_TTL_MS = APP_CONFIG.client.apiCacheTtlMs;

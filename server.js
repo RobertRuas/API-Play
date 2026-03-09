@@ -19,9 +19,10 @@ const os = require("os");
 const path = require("path");
 
 const app = express();
-const PORT = 3000;
-const HOST = "0.0.0.0";
-const CACHE_TTL_MS = 60 * 1000;
+const PORT = Number.parseInt(process.env.PORT, 10) || 3000;
+const HOST = String(process.env.HOST || "0.0.0.0");
+const CACHE_TTL_MS = Number.parseInt(process.env.XTREAM_CACHE_TTL_MS, 10) || 60 * 1000;
+const XTREAM_TIMEOUT_MS = Number.parseInt(process.env.XTREAM_TIMEOUT_MS, 10) || 12000;
 
 let activeConnection = {
   serverUrl: process.env.XTREAM_SERVER_URL || "",
@@ -33,6 +34,28 @@ const cache = new Map();
 
 app.use(express.json());
 app.use("/js", express.static(path.join(__dirname, "app/src/js")));
+
+// Injeta configuracoes de runtime no frontend a partir do .env.
+app.get("/app-config.js", (_req, res) => {
+  const runtimeConfig = {
+    xtream: {
+      serverUrl: process.env.XTREAM_SERVER_URL || "",
+      username: process.env.XTREAM_USERNAME || "",
+      password: process.env.XTREAM_PASSWORD || ""
+    },
+    client: {
+      apiCacheTtlMs: Number.parseInt(process.env.APP_API_CACHE_TTL_MS, 10) || 60 * 1000,
+      loginUsername: String(process.env.APP_LOGIN_USERNAME || "robert"),
+      loginPassword: String(process.env.APP_LOGIN_PASSWORD || "sempre"),
+      autoLoginEnabled: !["0", "false", "off"].includes(
+        String(process.env.APP_AUTO_LOGIN_ENABLED || "true").trim().toLowerCase()
+      )
+    }
+  };
+  res.type("application/javascript");
+  res.send(`window.__APP_ENV = ${JSON.stringify(runtimeConfig)};`);
+});
+
 app.use(express.static(path.join(__dirname, "app/public")));
 
 function normalizeBaseUrl(serverUrl) {
@@ -88,7 +111,7 @@ async function fetchXtream(conn, action, extraParams = {}) {
   let lastError;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(12000) });
+      const response = await fetch(url, { signal: AbortSignal.timeout(XTREAM_TIMEOUT_MS) });
       if (!response.ok) throw new Error(`Falha ao consultar Xtream (${response.status})`);
       const data = await response.json();
       cache.set(key, { data, expiresAt: now + CACHE_TTL_MS });

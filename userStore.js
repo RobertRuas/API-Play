@@ -102,12 +102,18 @@ function initFirestore() {
 
     if (inlineJson) {
       const credentials = JSON.parse(inlineJson);
+      if (typeof credentials.private_key === "string") {
+        credentials.private_key = credentials.private_key.replace(/\\n/g, "\n");
+      }
       admin.initializeApp({
         credential: admin.credential.cert(credentials),
         projectId
       });
     } else if (servicePath && fs.existsSync(servicePath)) {
       const credentials = JSON.parse(fs.readFileSync(servicePath, "utf8"));
+      if (typeof credentials.private_key === "string") {
+        credentials.private_key = credentials.private_key.replace(/\\n/g, "\n");
+      }
       admin.initializeApp({
         credential: admin.credential.cert(credentials),
         projectId

@@ -33,8 +33,8 @@ const {
 } = require("./userStore");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-const HOST = process.env.HOST || "0.0.0.0";
+const PORT = 3000;
+const HOST = "0.0.0.0";
 const CACHE_TTL_MS = 60 * 1000;
 
 let activeConnection = {
@@ -693,11 +693,7 @@ if (require.main === module) {
     for (const ip of lanIps) {
       console.log(`Rede local: http://${ip}:${PORT}`);
     }
-    if (!activeConnection.serverUrl || !activeConnection.username || !activeConnection.password) {
-      console.warn(
-        "Aviso: XTREAM_SERVER_URL, XTREAM_USERNAME e XTREAM_PASSWORD nao estao completos. " +
-          "Defina as variaveis de ambiente no servidor (ex.: Vercel)."
-      );
-    }
+    if (!activeConnection.serverUrl || !activeConnection.username || !activeConnection.password)
+      console.warn("Aviso: defina XTREAM_SERVER_URL, XTREAM_USERNAME e XTREAM_PASSWORD no ambiente.");
   });
 }

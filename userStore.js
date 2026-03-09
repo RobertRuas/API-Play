@@ -1,12 +1,47 @@
 const crypto = require("crypto");
-const fs = require("fs");
-const admin = require("firebase-admin");
 
 // -----------------------------------------------------------------------------
-// Store com persistência em Firestore
+// Store em memoria (sem banco de dados)
 // -----------------------------------------------------------------------------
-let db = null;
-let seedPromise = null;
+// Observacao:
+// - dados sao perdidos quando o processo reinicia;
+// - ideal para ambiente simples/testes sem dependencias externas.
+// -----------------------------------------------------------------------------
+
+const usersById = new Map();
+const userIdByUsername = new Map();
+const userIdByEmail = new Map();
+const sessionsByToken = new Map();
+
+const authConfig = {
+  auto_login_enabled: true,
+  auto_login_username: "robert",
+  updated_at: null,
+  updated_by: "system"
+};
+
+let seedDone = false;
+
+// Override opcional por ambiente:
+// - AUTO_LOGIN_OVERRIDE=off|false|0|disabled   => desativa
+// - AUTO_LOGIN_OVERRIDE=on|true|1|enabled      => ativa com usuario configurado (ou robert)
+// - AUTO_LOGIN_OVERRIDE=<username>              => ativa e força este usuario
+function resolveEnvAutoLoginOverride(currentUsername = "robert") {
+  const raw = String(process.env.AUTO_LOGIN_OVERRIDE || "").trim();
+  if (!raw) return null;
+  const normalized = raw.toLowerCase();
+  if (["off", "false", "0", "disabled"].includes(normalized)) {
+    return { enabled: false, username: "", overridden: true };
+  }
+  if (["on", "true", "1", "enabled"].includes(normalized)) {
+    return {
+      enabled: true,
+      username: String(currentUsername || "robert").trim().toLowerCase() || "robert",
+      overridden: true
+    };
+  }
+  return { enabled: true, username: normalized, overridden: true };
+}
 
 function nowIso() {
   return new Date().toISOString();
@@ -16,13 +51,16 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function isObject(value) {
+  return typeof value === "object" && value !== null;
+}
+
 function hashPassword(password) {
   return crypto.createHash("sha256").update(String(password || "")).digest("hex");
 }
 
 function normalizeType(type) {
-  if (type === "movies") return "vod";
-  if (type === "movie") return "vod";
+  if (type === "movies" || type === "movie") return "vod";
   if (type === "tv") return "live";
   return type;
 }
@@ -61,15 +99,19 @@ function ensurePreferences(pref) {
   if (!Array.isArray(p.favorites.vod)) p.favorites.vod = [];
   if (!Array.isArray(p.favorites.series)) p.favorites.series = [];
   if (!Array.isArray(p.continueWatching)) p.continueWatching = [];
+
   if (!isObject(p.hiddenCategories)) p.hiddenCategories = {};
   if (!Array.isArray(p.hiddenCategories.live)) p.hiddenCategories.live = [];
   if (!Array.isArray(p.hiddenCategories.vod)) p.hiddenCategories.vod = [];
   if (!Array.isArray(p.hiddenCategories.series)) p.hiddenCategories.series = [];
+
   if (!isObject(p.player)) p.player = {};
   if (typeof p.player.showBufferOverlay !== "boolean") p.player.showBufferOverlay = false;
+
   if (!isObject(p.catalog)) p.catalog = {};
   const perPage = Number.parseInt(p.catalog.itemsPerPage, 10);
   p.catalog.itemsPerPage = Number.isInteger(perPage) ? Math.min(50, Math.max(5, perPage)) : 20;
+
   if (!isObject(p.catalog.defaultCategory)) p.catalog.defaultCategory = {};
   for (const type of ["live", "vod", "series"]) {
     const raw = isObject(p.catalog.defaultCategory[type]) ? p.catalog.defaultCategory[type] : {};
@@ -78,191 +120,35 @@ function ensurePreferences(pref) {
       name: String(raw.name || (type === "series" ? "Todas" : "")).trim()
     };
   }
-  return p;
-}
 
-function isObject(value) {
-  return typeof value === "object" && value !== null;
+  return p;
 }
 
 function sanitizeUser(user) {
   if (!user) return null;
-  const { password_hash: _, ...safe } = user;
+  const { password_hash: _discard, ...safe } = user;
   return clone(safe);
 }
 
-function initFirestore() {
-  if (db) return db;
-
-  if (!admin.apps.length) {
-    const inlineJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-    const inlineBase64 = process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
-    const servicePath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
-    const googleCredPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-    const projectId = process.env.FIREBASE_PROJECT_ID || undefined;
-
-    const parseInlineCredentials = () => {
-      const rawJson = String(inlineJson || "").trim();
-      const rawBase64 = String(inlineBase64 || "").trim();
-      let payload = "";
-      if (rawBase64) {
-        payload = Buffer.from(rawBase64, "base64").toString("utf8");
-      } else {
-        payload = rawJson;
-      }
-      // Remove aspas externas acidentais quando valor e colado como string completa.
-      if (
-        (payload.startsWith('"') && payload.endsWith('"')) ||
-        (payload.startsWith("'") && payload.endsWith("'"))
-      ) {
-        payload = payload.slice(1, -1);
-      }
-      // Corrige escapes comuns de ambiente.
-      payload = payload.replace(/\\n/g, "\n");
-      return JSON.parse(payload);
-    };
-
-    if (inlineJson || inlineBase64) {
-      const credentials = parseInlineCredentials();
-      if (typeof credentials.private_key === "string") {
-        credentials.private_key = credentials.private_key.replace(/\\n/g, "\n");
-      }
-      admin.initializeApp({
-        credential: admin.credential.cert(credentials),
-        projectId
-      });
-    } else if (servicePath && fs.existsSync(servicePath)) {
-      const credentials = JSON.parse(fs.readFileSync(servicePath, "utf8"));
-      if (typeof credentials.private_key === "string") {
-        credentials.private_key = credentials.private_key.replace(/\\n/g, "\n");
-      }
-      admin.initializeApp({
-        credential: admin.credential.cert(credentials),
-        projectId
-      });
-    } else if (googleCredPath && fs.existsSync(googleCredPath)) {
-      admin.initializeApp({
-        credential: admin.credential.applicationDefault(),
-        projectId
-      });
-    } else {
-      throw new Error(
-        "Firebase nao configurado para backend. Defina FIREBASE_SERVICE_ACCOUNT_JSON " +
-          "ou FIREBASE_SERVICE_ACCOUNT_BASE64 (Vercel), ou FIREBASE_SERVICE_ACCOUNT_PATH/" +
-          "GOOGLE_APPLICATION_CREDENTIALS."
-      );
-    }
-  }
-
-  db = admin.firestore();
-  db.settings({ ignoreUndefinedProperties: true });
-  return db;
-}
-
-function usersCollection() {
-  return initFirestore().collection("users");
-}
-
-function sessionsCollection() {
-  return initFirestore().collection("sessions");
-}
-
-function appConfigCollection() {
-  return initFirestore().collection("app_config");
-}
-
-async function findUserByUsername(username) {
-  const normalized = String(username || "").trim().toLowerCase();
-  if (!normalized) return null;
-  const snap = await usersCollection().where("username", "==", normalized).limit(1).get();
-  if (snap.empty) return null;
-  const doc = snap.docs[0];
-  return { id: doc.id, ...doc.data() };
-}
-
-async function findUserByEmail(email) {
-  const normalized = String(email || "").trim().toLowerCase();
-  if (!normalized) return null;
-  const snap = await usersCollection().where("email", "==", normalized).limit(1).get();
-  if (snap.empty) return null;
-  const doc = snap.docs[0];
-  return { id: doc.id, ...doc.data() };
-}
-
-async function getUserById(userId) {
-  const doc = await usersCollection().doc(String(userId)).get();
-  if (!doc.exists) throw new Error("Usuario nao encontrado.");
-  return { id: doc.id, ...doc.data() };
-}
-
-async function ensureSeedDefaultUser() {
-  if (seedPromise) return seedPromise;
-  seedPromise = (async () => {
-    const existing = await findUserByUsername("robert");
-    if (!existing) {
-      await createUser({
-        name: "Robert Ruas",
-        email: "92ruas@gmail.com",
-        username: "robert",
-        password: "sempre",
-        role: "admin"
-      });
-    } else if (existing.role !== "admin") {
-      await usersCollection().doc(existing.id).update({
-        role: "admin",
-        updated_at: nowIso()
-      });
-    }
-
-    const authConfigRef = appConfigCollection().doc("auth");
-    const authConfigDoc = await authConfigRef.get();
-    if (!authConfigDoc.exists) {
-      await authConfigRef.set({
-        auto_login_enabled: false,
-        auto_login_username: "",
-        updated_at: nowIso(),
-        updated_by: "system"
-      });
-    }
-  })();
-  await seedPromise;
-}
-
-async function createSessionForUser(userId) {
-  const token = crypto.randomBytes(24).toString("hex");
-  const stamp = nowIso();
-  await sessionsCollection().doc(token).set({
-    token,
-    user_id: userId,
-    created_at: stamp,
-    updated_at: stamp
-  });
-  await usersCollection().doc(String(userId)).update({
-    last_login_at: stamp,
-    updated_at: stamp
-  });
-  return token;
+function requireUserById(userId) {
+  const user = usersById.get(String(userId));
+  if (!user) throw new Error("Usuario nao encontrado.");
+  return user;
 }
 
 async function createUser({ name, email, username, password, role = "user", phone = "", avatar_url = "" }) {
-  initFirestore();
   const normalizedEmail = String(email || "").trim().toLowerCase();
   const normalizedUsername = String(username || "").trim().toLowerCase();
   if (!name || !normalizedEmail || !normalizedUsername || !password) {
     throw new Error("name, email, username e password sao obrigatorios.");
   }
-
-  const [byEmail, byUsername] = await Promise.all([
-    findUserByEmail(normalizedEmail),
-    findUserByUsername(normalizedUsername)
-  ]);
-  if (byEmail) throw new Error("Email ja cadastrado.");
-  if (byUsername) throw new Error("Usuario ja cadastrado.");
+  if (userIdByEmail.has(normalizedEmail)) throw new Error("Email ja cadastrado.");
+  if (userIdByUsername.has(normalizedUsername)) throw new Error("Usuario ja cadastrado.");
 
   const userId = crypto.randomUUID();
   const user = {
     id: userId,
-    name: String(name).trim(),
+    name: String(name || "").trim(),
     email: normalizedEmail,
     username: normalizedUsername,
     password_hash: hashPassword(password),
@@ -275,136 +161,170 @@ async function createUser({ name, email, username, password, role = "user", phon
     last_login_at: null,
     preferences: defaultPreferences()
   };
-  await usersCollection().doc(userId).set(user);
+  usersById.set(userId, user);
+  userIdByUsername.set(normalizedUsername, userId);
+  userIdByEmail.set(normalizedEmail, userId);
   return sanitizeUser(user);
 }
 
+async function ensureSeedDefaultUser() {
+  if (seedDone) return;
+  const existingId = userIdByUsername.get("robert");
+  if (!existingId) {
+    await createUser({
+      name: "Robert Ruas",
+      email: "92ruas@gmail.com",
+      username: "robert",
+      password: "sempre",
+      role: "admin"
+    });
+  } else {
+    const user = requireUserById(existingId);
+    if (user.role !== "admin") user.role = "admin";
+    user.updated_at = nowIso();
+  }
+  // Mantem auto-login padrao sempre apontando para usuario existente.
+  if (!authConfig.auto_login_username) authConfig.auto_login_username = "robert";
+  if (typeof authConfig.auto_login_enabled !== "boolean") authConfig.auto_login_enabled = true;
+  seedDone = true;
+}
+
 async function listUsers() {
-  initFirestore();
   await ensureSeedDefaultUser();
-  const snap = await usersCollection().orderBy("created_at", "asc").limit(500).get();
-  return snap.docs.map((doc) => sanitizeUser({ id: doc.id, ...doc.data() }));
+  const rows = Array.from(usersById.values()).sort((a, b) =>
+    String(a.created_at || "").localeCompare(String(b.created_at || ""))
+  );
+  return rows.map((row) => sanitizeUser(row));
+}
+
+async function createSessionForUser(userId) {
+  const token = crypto.randomBytes(24).toString("hex");
+  const stamp = nowIso();
+  sessionsByToken.set(token, {
+    token,
+    user_id: String(userId),
+    created_at: stamp,
+    updated_at: stamp
+  });
+  const user = requireUserById(userId);
+  user.last_login_at = stamp;
+  user.updated_at = stamp;
+  return token;
 }
 
 async function login({ username, email, password }) {
-  initFirestore();
   await ensureSeedDefaultUser();
   const normalizedUsername = String(username || "").trim().toLowerCase();
   const normalizedEmail = String(email || "").trim().toLowerCase();
   const pwdHash = hashPassword(password);
-  const user = normalizedUsername ? await findUserByUsername(normalizedUsername) : await findUserByEmail(normalizedEmail);
+  const userId = normalizedUsername
+    ? userIdByUsername.get(normalizedUsername)
+    : userIdByEmail.get(normalizedEmail);
+  const user = userId ? usersById.get(userId) : null;
   if (!user) throw new Error("Credenciais invalidas.");
   if (user.password_hash !== pwdHash) throw new Error("Credenciais invalidas.");
   if (user.status !== "active") throw new Error("Usuario inativo.");
 
   const token = await createSessionForUser(user.id);
-
-  const fullUser = await getUserById(user.id);
-  fullUser.preferences = ensurePreferences(fullUser.preferences);
+  user.preferences = ensurePreferences(user.preferences);
   return {
     token,
-    user: sanitizeUser(fullUser),
-    preferences: clone(fullUser.preferences)
+    user: sanitizeUser(user),
+    preferences: clone(user.preferences)
   };
-}
-
-async function getUserByToken(token) {
-  initFirestore();
-  await ensureSeedDefaultUser();
-  const sessionDoc = await sessionsCollection().doc(String(token || "")).get();
-  if (!sessionDoc.exists) return null;
-  const session = sessionDoc.data() || {};
-  if (!session.user_id) return null;
-  const userDoc = await usersCollection().doc(String(session.user_id)).get();
-  if (!userDoc.exists) return null;
-  const user = { id: userDoc.id, ...userDoc.data() };
-  user.preferences = ensurePreferences(user.preferences);
-  return sanitizeUser(user);
 }
 
 async function logoutByToken(token) {
   await ensureSeedDefaultUser();
   if (!token) return;
-  await sessionsCollection().doc(String(token)).delete();
+  sessionsByToken.delete(String(token));
+}
+
+async function getUserByToken(token) {
+  await ensureSeedDefaultUser();
+  const session = sessionsByToken.get(String(token || "").trim());
+  if (!session || !session.user_id) return null;
+  const user = usersById.get(String(session.user_id));
+  if (!user) return null;
+  user.preferences = ensurePreferences(user.preferences);
+  return sanitizeUser(user);
 }
 
 async function getAuthConfig() {
   await ensureSeedDefaultUser();
-  const doc = await appConfigCollection().doc("auth").get();
-  if (!doc.exists) {
+  const envOverride = resolveEnvAutoLoginOverride(authConfig.auto_login_username || "robert");
+  if (envOverride) {
     return {
-      auto_login_enabled: false,
-      auto_login_username: ""
+      auto_login_enabled: envOverride.enabled,
+      auto_login_username: envOverride.username
     };
   }
-  const data = doc.data() || {};
   return {
-    auto_login_enabled: Boolean(data.auto_login_enabled),
-    auto_login_username: String(data.auto_login_username || "")
+    auto_login_enabled: Boolean(authConfig.auto_login_enabled),
+    auto_login_username: String(authConfig.auto_login_username || "")
   };
 }
 
 async function updateAuthConfig({ auto_login_enabled, auto_login_username }, actorUserId) {
   await ensureSeedDefaultUser();
-  const username = String(auto_login_username || "").trim().toLowerCase();
   const enabled = Boolean(auto_login_enabled);
+  const username = String(auto_login_username || "").trim().toLowerCase();
   if (enabled && !username) {
     throw new Error("Informe o usuario para auto-login.");
   }
   if (enabled) {
-    const user = await findUserByUsername(username);
+    const id = userIdByUsername.get(username);
+    const user = id ? usersById.get(id) : null;
     if (!user) throw new Error("Usuario de auto-login nao encontrado.");
     if (user.status !== "active") throw new Error("Usuario de auto-login inativo.");
   }
-
-  const nextConfig = {
-    auto_login_enabled: enabled,
-    auto_login_username: enabled ? username : "",
-    updated_at: nowIso(),
-    updated_by: String(actorUserId || "system")
-  };
-  await appConfigCollection().doc("auth").set(nextConfig);
+  authConfig.auto_login_enabled = enabled;
+  authConfig.auto_login_username = enabled ? username : "";
+  authConfig.updated_at = nowIso();
+  authConfig.updated_by = String(actorUserId || "system");
   return {
-    auto_login_enabled: nextConfig.auto_login_enabled,
-    auto_login_username: nextConfig.auto_login_username
+    auto_login_enabled: authConfig.auto_login_enabled,
+    auto_login_username: authConfig.auto_login_username
   };
 }
 
 async function tryAutoLogin() {
   await ensureSeedDefaultUser();
-  const config = await getAuthConfig();
-  if (!config.auto_login_enabled || !config.auto_login_username) return null;
-  const user = await findUserByUsername(config.auto_login_username);
+  const effective = resolveEnvAutoLoginOverride(authConfig.auto_login_username || "robert") || {
+    enabled: authConfig.auto_login_enabled,
+    username: authConfig.auto_login_username
+  };
+  if (!effective.enabled || !effective.username) return null;
+  const userId = userIdByUsername.get(String(effective.username));
+  const user = userId ? usersById.get(userId) : null;
   if (!user || user.status !== "active") return null;
   const token = await createSessionForUser(user.id);
-  const fullUser = await getUserById(user.id);
-  fullUser.preferences = ensurePreferences(fullUser.preferences);
+  user.preferences = ensurePreferences(user.preferences);
   return {
     token,
-    user: sanitizeUser(fullUser),
-    preferences: clone(fullUser.preferences)
+    user: sanitizeUser(user),
+    preferences: clone(user.preferences)
   };
 }
 
 async function getPreferences(userId) {
   await ensureSeedDefaultUser();
-  const user = await getUserById(userId);
-  return clone(ensurePreferences(user.preferences));
+  const user = requireUserById(userId);
+  user.preferences = ensurePreferences(user.preferences);
+  return clone(user.preferences);
 }
 
 async function resetPreferences(userId) {
   await ensureSeedDefaultUser();
-  const preferences = defaultPreferences();
-  await usersCollection().doc(String(userId)).update({
-    preferences,
-    updated_at: nowIso()
-  });
-  return clone(preferences);
+  const user = requireUserById(userId);
+  user.preferences = defaultPreferences();
+  user.updated_at = nowIso();
+  return clone(user.preferences);
 }
 
 async function updateSettings(userId, patch = {}) {
   await ensureSeedDefaultUser();
-  const user = await getUserById(userId);
+  const user = requireUserById(userId);
   const prefs = ensurePreferences(user.preferences);
 
   if (patch?.player && typeof patch.player.showBufferOverlay === "boolean") {
@@ -437,16 +357,14 @@ async function updateSettings(userId, patch = {}) {
     }
   }
 
-  await usersCollection().doc(String(userId)).update({
-    preferences: prefs,
-    updated_at: nowIso()
-  });
+  user.preferences = prefs;
+  user.updated_at = nowIso();
   return clone(prefs);
 }
 
 async function toggleFavorite(userId, item = {}) {
   await ensureSeedDefaultUser();
-  const user = await getUserById(userId);
+  const user = requireUserById(userId);
   const prefs = ensurePreferences(user.preferences);
   const type = normalizeType(String(item.type || "").trim());
   if (!["live", "vod", "series"].includes(type)) throw new Error("type invalido para favorito.");
@@ -454,14 +372,15 @@ async function toggleFavorite(userId, item = {}) {
   const streamId = String(item.stream_id || item.series_id || "").trim();
   if (!streamId) throw new Error("stream_id/series_id obrigatorio.");
 
-  const favs = Array.isArray(prefs.favorites[type]) ? prefs.favorites[type] : [];
-  const index = favs.findIndex((fav) => String(fav.stream_id) === streamId);
+  const list = Array.isArray(prefs.favorites[type]) ? prefs.favorites[type] : [];
+  const index = list.findIndex((fav) => String(fav.stream_id) === streamId);
   let favorite = false;
+
   if (index >= 0) {
-    favs.splice(index, 1);
+    list.splice(index, 1);
     favorite = false;
   } else {
-    favs.unshift({
+    list.unshift({
       stream_id: streamId,
       type,
       title: String(item.title || "").trim(),
@@ -471,11 +390,9 @@ async function toggleFavorite(userId, item = {}) {
     });
     favorite = true;
   }
-  prefs.favorites[type] = favs;
-  await usersCollection().doc(String(userId)).update({
-    preferences: prefs,
-    updated_at: nowIso()
-  });
+  prefs.favorites[type] = list;
+  user.preferences = prefs;
+  user.updated_at = nowIso();
   return { favorite };
 }
 
@@ -489,7 +406,7 @@ async function listFavorites(userId, type) {
 
 async function upsertContinueWatching(userId, payload = {}) {
   await ensureSeedDefaultUser();
-  const user = await getUserById(userId);
+  const user = requireUserById(userId);
   const prefs = ensurePreferences(user.preferences);
   const type = normalizeType(String(payload.type || "").trim());
   const streamId = String(payload.stream_id || payload.series_id || "").trim();
@@ -505,7 +422,7 @@ async function upsertContinueWatching(userId, payload = {}) {
   const key = `${type}:${streamId}`;
   const list = Array.isArray(prefs.continueWatching) ? prefs.continueWatching : [];
   const index = list.findIndex((row) => row.key === key);
-  const item = {
+  const row = {
     key,
     type,
     stream_id: streamId,
@@ -517,15 +434,13 @@ async function upsertContinueWatching(userId, payload = {}) {
     progress_percent: progressPercent,
     updated_at: nowIso()
   };
-  if (index >= 0) list.splice(index, 1);
-  list.unshift(item);
-  prefs.continueWatching = list.slice(0, 300);
 
-  await usersCollection().doc(String(userId)).update({
-    preferences: prefs,
-    updated_at: nowIso()
-  });
-  return clone(item);
+  if (index >= 0) list.splice(index, 1);
+  list.unshift(row);
+  prefs.continueWatching = list.slice(0, 300);
+  user.preferences = prefs;
+  user.updated_at = nowIso();
+  return clone(row);
 }
 
 async function listContinueWatching(userId) {
@@ -544,8 +459,8 @@ function isFavoriteFromPreferences(preferences, type, streamId) {
 function progressForFromPreferences(preferences, type, streamId) {
   const prefs = ensurePreferences(preferences);
   const key = `${normalizeType(type)}:${streamId}`;
-  const item = (prefs.continueWatching || []).find((row) => row.key === key);
-  return item ? clone(item) : null;
+  const row = (prefs.continueWatching || []).find((item) => item.key === key);
+  return row ? clone(row) : null;
 }
 
 module.exports = {

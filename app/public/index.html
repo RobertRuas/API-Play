@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Xtream App</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" />
+  </head>
+  <body>
+    <button id="menu-toggle" class="menu-toggle" type="button" aria-label="Abrir menu">
+      <i class="bi bi-list"></i>
+    </button>
+    <div id="sidebar-overlay" class="sidebar-overlay" hidden></div>
+    <aside class="sidebar">
+      <div>
+        <form id="global-search-form" class="sidebar-search-form">
+          <div class="sidebar-search-row">
+            <input
+              id="global-search-input"
+              type="search"
+              placeholder="Buscar TV, filmes e series..."
+              aria-label="Buscar TV, filmes e series"
+            />
+            <button type="submit" aria-label="Buscar"><i class="bi bi-search"></i></button>
+          </div>
+        </form>
+        <nav class="side-nav">
+          <a href="#/favorites" data-link><i class="bi bi-star-fill"></i><span>Favoritos</span></a>
+          <a href="#/live" data-link><i class="bi bi-broadcast"></i><span>TV ao vivo</span></a>
+          <a href="#/movies" data-link><i class="bi bi-film"></i><span>Filmes</span></a>
+          <a href="#/series" data-link><i class="bi bi-collection-play-fill"></i><span>Series</span></a>
+        </nav>
+      </div>
+      <div class="sidebar-bottom">
+        <a class="side-subtle" href="#/settings" data-link><i class="bi bi-gear-fill"></i><span>Configuracao</span></a>
+        <a class="side-subtle" href="#/login" data-action="logout"><i class="bi bi-box-arrow-right"></i><span>Sair</span></a>
+      </div>
+    </aside>
+
+    <main class="app-shell">
+      <p id="global-status" class="status" hidden></p>
+      <section id="app"></section>
+    </main>
+
+    <div id="page-loader" class="page-loader" hidden>
+      <div class="page-loader-inner">
+        <div class="page-loader-spinner"></div>
+        <p>Carregando conteudo...</p>
+      </div>
+    </div>
+
+    <div id="player-modal" class="modal" hidden>
+      <div class="modal-content">
+        <div class="modal-head">
+          <h3 id="modal-title">Player</h3>
+          <div class="modal-actions">
+            <button id="close-modal" type="button">Fechar</button>
+          </div>
+        </div>
+        <div id="player-loading" class="player-loading" hidden>
+          <div class="loader-dot"></div>
+          <span>Preparando reprodu&ccedil;&atilde;o...</span>
+        </div>
+        <p id="player-meta" class="player-meta"></p>
+        <div id="player-buffer-chip" class="player-buffer-chip" hidden>Buffer: --</div>
+        <video id="modal-player" controls autoplay playsinline></video>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.18/dist/hls.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script type="module" src="/js/main.js"></script>
+  </body>
+</html>

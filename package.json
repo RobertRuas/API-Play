@@ -1,0 +1,20 @@
+{
+  "name": "xtream-minimo-json-urls",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aplicacao minima para consumir Xtream e exibir JSON + URLs acessiveis.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "HOST=0.0.0.0 nodemon server.js",
+    "start:firebase": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "express": "^4.21.2",
+    "firebase-admin": "^13.0.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
